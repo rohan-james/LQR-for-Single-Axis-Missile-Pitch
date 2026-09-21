@@ -1,8 +1,11 @@
-name: Build LaTeX Document
+name: Build LaTeX Document and Update README
 
 on:
   push:
     branches: [ "main", "master" ]
+
+permissions:
+  contents: write
 
 jobs:
   build_latex:
@@ -16,8 +19,15 @@ jobs:
         with:
           root_file: documentation.tex
 
-      - name: Upload PDF Artifact
-        uses: actions/upload-artifact@v4
+      - name: Install Pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Convert LaTeX to README.md
+        run: |
+          pandoc documentation.tex -o README.md --mathjax
+
+      - name: Commit and Push PDF and README
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          name: Documentation
-          path: documentation.pdf
+          commit_message: "docs: auto-compile LaTeX to PDF and README [skip ci]"
+          file_pattern: "documentation.pdf README.md"
