@@ -1,0 +1,210 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{parskip}
+
+\geometry{margin=1in}
+
+\title{\textbf{Application of the Riccati Equation \& Design of an LQR for a Single-Axis Missile Pitch Model}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{System Dynamics and Cost Functional Formulations}
+
+Consider a continuous-time linear time-invariant (LTI) dynamic system governed by the state-space equation:
+\begin{equation}
+\dot{x}(t) = A x(t) + B u(t)
+\end{equation}
+
+To design an optimal control policy over a finite time horizon $t \in [t_0, t_f]$, a quadratic performance index $J$ is defined in scalar-matrix form:
+\begin{equation}
+J = \frac{1}{2} x(t_f)^T Q_f x(t_f) + \frac{1}{2} \int_{t_0}^{t_f} \left( x(t)^T Q(t) x(t) + 2 x(t)^T N(t) u(t) + u(t)^T R(t) u(t) \right) dt
+\end{equation}
+
+For infinite-horizon regulator problems where $t_f \to \infty$, terminal state constraints are relaxed, yielding the stationary performance functional:
+\begin{equation}
+J = \frac{1}{2} \int_{0}^{\infty} \left( x(t)^T Q(t) x(t) + 2 x(t)^T N(t) u(t) + u(t)^T R(t) u(t) \right) dt
+\end{equation}
+
+\subsection*{Physical Interpretations of Cost Matrix Terms}
+\begin{itemize}
+    \item $x(t_f)^T Q_f x(t_f)$ --- \textbf{Terminal Cost Weighting}: Penalizes residual state deviations at the final time $t_f$, ensuring precise trajectory completion.
+    \item $u(t)^T R(t) u(t)$ --- \textbf{Control Expenditure Penalty}: Penalizes control effort to prevent actuator saturation and reduce physical energy consumption.
+    \item $2 x(t)^T N(t) u(t)$ --- \textbf{Cross-Coupling Penalty}: Penalizes specific joint interactions between system states and control inputs.
+\end{itemize}
+
+\subsection*{Solvability Constraints}
+To guarantee a well-posed optimization problem with a unique, stable solution, the composite weighting matrix must be positive semi-definite, and the control penalty matrix must be strictly positive definite:
+\begin{equation}
+\begin{bmatrix} Q & N \\ N^T & R \end{bmatrix} \ge 0 \quad \text{and} \quad R > 0
+\end{equation}
+
+\section{Algebraic Riccati Equation and Numerical Solvers}
+
+For infinite-horizon Linear Quadratic Regulator (LQR) problems, the optimal state-feedback gain matrix is derived from the symmetric positive semi-definite solution matrix $P$ satisfying the Continuous Algebraic Riccati Equation (CARE):
+\begin{equation}
+A^T P + P A + Q - P B R^{-1} B^T P = 0
+\end{equation}
+Once the unique stabilizing solution matrix $P$ is calculated, the optimal state-feedback control law $u(t) = -K x(t)$ is established to stabilize the closed-loop system.
+
+\subsection{Numerical Solution Methods for CARE}
+
+\subsubsection{Eigen-Decomposition Method (Direct Solvers)}
+This approach converts the non-linear quadratic matrix equation of dimension $n \times n$ into a linear $2n \times 2n$ matrix problem governed by the system Hamiltonian matrix $H$:
+\begin{equation}
+H = \begin{bmatrix} A & -B R^{-1} B^T \\ -Q & -A^T \end{bmatrix}
+\end{equation}
+
+\subsubsection{Laub's Schur Method}
+Direct eigenvector computation can suffer from severe numerical instability in the presence of repeated or ill-conditioned eigenvalues. Laub's Schur method provides a numerically robust alternative by employing an ordered real Schur decomposition of $H$:
+\begin{enumerate}
+    \item Compute the real Schur decomposition $H = U T U^T$, where $T$ is quasi-upper triangular and $U = \begin{bmatrix} U_{11} & U_{12} \\ U_{21} & U_{22} \end{bmatrix}$ is orthogonal.
+    \item Reorder $T$ using orthogonal Givens rotations such that the $n$ stable eigenvalues satisfying $\text{Re}(\lambda) < 0$ occupy the upper-left $n \times n$ block of $T$.
+    \item Extract the stable invariant subspace spanned by the first $n$ columns of $U$ to compute $P$:
+    \begin{equation}
+    P = U_{21} U_{11}^{-1}
+    \end{equation}
+\end{enumerate}
+
+\section{Missile Pitch Dynamics and Environmental Modeling}
+
+\subsection{Atmospheric and Physical Parameters}
+The physical geometry and atmospheric operating conditions governing missile pitch dynamics are modeled as follows:
+\begin{itemize}
+    \item \textbf{Pitch Moment of Inertia}: $I_{yy} = \frac{1}{12} M L^2 + \frac{1}{4} M R^2$
+    \item \textbf{Ambient Temperature Profile}: 
+    \begin{equation}
+    T = \begin{cases} 
+    216.65 \text{ K}, & \text{if } \text{altitude} > 11 \text{ km} \\
+    288.15 - 0.0065 \times \text{altitude}, & \text{if } \text{altitude} \le 11 \text{ km}
+    \end{cases}
+    \end{equation}
+    \item \textbf{Speed of Sound}: $a = \sqrt{\gamma R T}$
+    \item \textbf{Flight Velocity}: $V = \text{Mach number} \times a$
+    \item \textbf{Atmospheric Pressure}: $p = 101325 \times e^{-h / H}, \quad H = 8500 \text{ m}$
+    \item \textbf{Air Density}: $\rho = 1.225 \times e^{-h / H}$
+    \item \textbf{Dynamic Pressure}: $\bar{q} = \frac{1}{2} \rho V^2$
+\end{itemize}
+
+\subsection{Dimensional Stability Derivatives}
+Normalizing dynamic parameters by missile mass $m$, reference area $S$, mean aerodynamic chord $\bar{c}$, and velocity $V$ yields the dimensional stability derivatives:
+\begin{equation}
+Z_\alpha = \frac{\bar{q} S}{m V} C_{Z\alpha}, \quad Z_\delta = \frac{\bar{q} S}{m V} C_{Z\delta}, \quad M_\alpha = \frac{\bar{q} S \bar{c}}{I_{yy}} C_{m\alpha}, \quad M_\delta = \frac{\bar{q} S \bar{c}}{I_{yy}} C_{m\delta}
+\end{equation}
+
+\subsection{State-Space Representation}
+Choosing the state vector as $x(t) = [\Delta \alpha(t), \Delta q(t)]^T$ and control input as $u(t) = \Delta \delta(t)$, the linearized system dynamics are formulated as:
+\begin{equation}
+A = \begin{bmatrix} Z_\alpha & 1 + Z_q \\ M_\alpha & M_q \end{bmatrix}, \quad B = \begin{bmatrix} Z_\delta \\ M_\delta \end{bmatrix}
+\end{equation}
+
+
+\section{Linearization and Aerodynamic Derivatives}
+
+\subsection{Bryson's Rule for Cost Function Scaling}
+To account for unit discrepancies across state and control variables, Bryson's rule scales each diagonal entry in $Q$ and $R$ by the inverse square of its maximum allowable physical limit (with angular units expressed in radians):
+\begin{equation}
+Q = \begin{bmatrix} \frac{1}{\alpha_{\max}^2} & 0 \\ 0 & \frac{1}{q_{\max}^2} \end{bmatrix}, \quad R = \begin{bmatrix} \frac{1}{\delta_{\max}^2} \end{bmatrix}
+\end{equation}
+
+\subsection{Linearization Around a Trim Condition}
+Missile flight dynamics are non-linear. To design a linear quadratic controller, the non-linear equations of motion are linearized about a trimmed flight equilibrium condition $(x_0, u_0)$ using a first-order Taylor series expansion:
+\begin{equation}
+\dot{x} \approx f(x_0, u_0) + \left.\frac{\partial f}{\partial x}\right|_0 \Delta x + \left.\frac{\partial f}{\partial u}\right|_0 \Delta u
+\end{equation}
+
+\textbf{Short-Period Mode Analysis:} The pitch channel response is dominated by the short-period mode, characterized by rapid rotational pitching and fast variation in angle of attack $\alpha$. Matrix $A$ captures how the system state rates $(\dot{\alpha}, \dot{q})$ evolve due to state perturbations independent of control input.
+
+\subsubsection{Pitch Acceleration ($\dot{q}$)}
+From Newton's second law for rotational dynamics about the missile pitch axis ($Y_B$):
+\begin{equation}
+I_{yy} \dot{q} = M_{\text{total}}(\alpha, q, \delta)
+\end{equation}
+Linearizing about the trim point yields:
+\begin{equation}
+\Delta \dot{q} = \underbrace{\left( \frac{1}{I_{yy}} \frac{\partial M}{\partial \alpha} \right)}_{M_\alpha} \Delta \alpha + \underbrace{\left( \frac{1}{I_{yy}} \frac{\partial M}{\partial q} \right)}_{M_q} \Delta q
+\end{equation}
+
+\begin{itemize}
+    \item $M_\alpha \rightarrow$ \textbf{Pitch Stiffness / Static Longitudinal Stability}: Quantifies the restoring aerodynamic torque per unit change in $\alpha$.
+    \begin{itemize}
+        \item $M_\alpha < 0 \implies$ Statically stable (generates a stabilizing restoring moment toward zero angle of attack).
+        \item $M_\alpha > 0 \implies$ Aerodynamically unstable (requires active feedback augmentation).
+    \end{itemize}
+    \item $M_q \rightarrow$ \textbf{Pitch Damping Derivative}: Quantifies aerodynamic resistance opposing pitch rate rotation.
+\end{itemize}
+
+\subsubsection{Angle-of-Attack Rate ($\dot{\alpha}$)}
+The rate of change of angle of attack is derived from fundamental kinematic relations along the body vertical axis ($Z_B$). Kinematically:
+\begin{equation}
+\theta = \gamma + \alpha \implies \dot{\alpha} = \dot{\theta} - \dot{\gamma} = q - \dot{\gamma} \quad (\text{where } \gamma = \text{flight path angle})
+\end{equation}
+Applying Newton's second law along the lift vector axis, the flight path angle rate $\dot{\gamma}$ is driven by vertical aerodynamic force $F_z$:
+\begin{equation}
+m V \dot{\gamma} = -F_z \implies \dot{\gamma} = -\frac{F_z}{m V}
+\end{equation}
+
+
+\section{Kinematic Relationships and Cost Functional Tuning}
+
+Combining the expressions for flight path rate and kinematics yields the non-linear angle-of-attack derivative:
+\begin{equation}
+\dot{\alpha} = q + \frac{F_z(\alpha, q, \delta)}{m V}
+\end{equation}
+Linearizing the aerodynamic force contribution gives:
+\begin{equation}
+\frac{F_z}{m V} \approx \underbrace{\left( \frac{1}{m V} \frac{\partial F_z}{\partial \alpha} \right)}_{Z_\alpha} \Delta \alpha + \underbrace{\left( \frac{1}{m V} \frac{\partial F_z}{\partial q} \right)}_{Z_q} \Delta q
+\end{equation}
+\begin{equation}
+\implies \Delta \dot{\alpha} = Z_\alpha \Delta \alpha + (1 + Z_q) \Delta q
+\end{equation}
+
+\subsection*{Physical Interpretation of Terms}
+\begin{itemize}
+    \item \textbf{Kinematic Coupling ($1$):} Pure body rotation. In the absence of spatial velocity vector reorientation ($\dot{\gamma} = 0$), pitching at rate $q$ increases $\alpha$ at a $1:1$ ratio.
+    \item $Z_\alpha$ \textbf{(Force Derivative):} Vertical aerodynamic force generated per unit variation in $\alpha$. Under standard sign conventions ($Z$-axis pointing downward), lift generation makes $Z_\alpha$ strictly negative.
+    \item $Z_q$ \textbf{(Rotary Force Derivative):} Incremental normal force generated across aerodynamic surfaces during pitching rotation ($Z_q \ll 1$).
+    \item $M_\delta$ \textbf{(Control Effectiveness):} Control moment per unit fin deflection relative to inertia $I_{yy}$; serves as the primary control authority metric for pitch rotational acceleration.
+    \item $Z_\delta$ \textbf{(Direct Control Force Derivative):} Direct normal force generated immediately upon deflecting the control surface.
+\end{itemize}
+
+\begin{quote}
+\textbf{Note on Non-Minimum-Phase Behavior:} Deflecting a tail control fin to initiate an upward pitch initially exerts a downward normal force ($Z_\delta$). This creates a transient initial drop in trajectory prior to angle-of-attack buildup, producing non-minimum-phase dynamics (right-half-plane zeros).
+\end{quote}
+
+\subsection{Cost Functional Tuning Strategies}
+The explicit quadratic cost functional is expressed as:
+\begin{equation}
+J = \int_0^\infty \left( x^T Q x + u^T R u \right) dt = \int_0^\infty \left( Q_{11} \Delta \alpha^2 + Q_{22} \Delta q^2 + R_{11} \Delta \delta^2 \right) dt
+\end{equation}
+
+Selecting unweighted identity matrices ($Q = I$, $R = I$) introduces severe scale distortion, as numerical values for pitch rates $\Delta q$ typically dwarf angle-of-attack perturbations $\Delta \alpha$. Applying Bryson's normalization ($Q_{11} = \frac{1}{\Delta \alpha_{\max}^2}$) scales non-dimensional errors into the unit range $[0, 1]$.
+\begin{itemize}
+    \item \textbf{Increasing $Q_{11}$}: Heavily penalizes angle-of-attack deviations, prioritizing strict trajectory tracking at the expense of aggressive control surface activity and higher actuator slew rates.
+    \item \textbf{Increasing $R_{11}$}: Heavily penalizes actuator movement, promoting smooth fin deflections and preventing actuator fatigue at the expense of slower transient tracking response.
+\end{itemize}
+
+
+\section{Aerodynamic Coefficient Definitions}
+
+\begin{itemize}
+    \item $C_Z$ \textbf{(Vertical Force Coefficient):} Dimensionless aerodynamic force component acting along the vehicle's body $Z$-axis.
+    \item $C_m$ \textbf{(Pitching Moment Coefficient):} Dimensionless aerodynamic pitching torque about the center of gravity.
+    \item $C_{Z\alpha}$ \textbf{(Normal Force Curve Slope):} Sensitivity of vertical force coefficient with respect to angle of attack ($\alpha$).
+    \item $C_{Z\delta}$ \textbf{(Control Surface Force Coefficient):} Sensitivity of vertical force coefficient with respect to control surface deflection ($\delta$).
+    \item $C_{m\alpha}$ \textbf{(Static Longitudinal Stability Derivative):} Aerodynamic stiffness coefficient. A negative sign ($C_{m\alpha} < 0$) signifies inherent dynamic stability.
+    \item $C_{m\delta}$ \textbf{(Control Moment Effectiveness):} Sensitivity of pitching moment with respect to fin deflection ($\delta$), dictating dynamic maneuverability.
+\end{itemize}
+
+Mathematically, these non-dimensional aerodynamic coefficients are calculated via partial differentiation:
+\begin{equation}
+C_{m\alpha} = \frac{\partial C_m}{\partial \alpha}
+\end{equation}
+
+\end{document}
